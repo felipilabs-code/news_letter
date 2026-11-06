@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fetchGuardianDay, GUARDIAN_QUERY_VERSION } from './guardian.js';
-import { translateEdition } from './openai.js';
+import { translateEdition, needsTranslation } from './openai.js';
 import { fetchRssFeeds } from './rss.js';
 import { createEdition, mergeSource, newsletterMarkdown, sourceCollected } from './edition.js';
 
@@ -85,7 +85,7 @@ async function syncIfNeeded() {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!guardianKey) return;
   const missingSource = edition && !sourceCollected(edition, neededRound(edition.date, plan));
-  const pendingTranslation = edition && openaiKey && edition.articles.some(item => item.language !== 'pt-BR');
+  const pendingTranslation = edition && openaiKey && edition.articles.some(needsTranslation);
   if (edition?.date >= target && !missingSource && !pendingTranslation) return;
   syncing = true;
   try {
@@ -127,7 +127,7 @@ async function completeEdition(plan) {
 }
 
 async function translateCurrent() {
-  if (!edition || !process.env.OPENAI_API_KEY || edition.articles.every(item => item.language === 'pt-BR')) return;
+  if (!edition || !process.env.OPENAI_API_KEY || !edition.articles.some(needsTranslation)) return;
   translating = true;
   try {
     await translateEdition(edition, process.env.OPENAI_API_KEY, {

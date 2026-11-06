@@ -27,3 +27,11 @@ test('não aceita resposta incompleta do OpenAI', async () => {
   }), /lista incompleta/);
   assert.equal(edition.articles[0].title, 'New chip');
 });
+
+test('retraduz matérias traduzidas com versão anterior do prompt', async () => {
+  const { needsTranslation, TRANSLATION_VERSION } = await import('./openai.js');
+  assert.equal(needsTranslation({ language: 'pt-BR', title: 'Nativo' }), false);
+  assert.equal(needsTranslation({ language: 'pt-BR', titleOriginal: 'X', translationVersion: TRANSLATION_VERSION }), false);
+  assert.equal(needsTranslation({ language: 'pt-BR', titleOriginal: 'X' }), true);
+  assert.equal(needsTranslation({ language: 'en', title: 'X' }), true);
+});

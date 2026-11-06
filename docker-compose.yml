@@ -9,6 +9,7 @@ services:
       PORT: "3000"
       GUARDIAN_API_KEY: "${GUARDIAN_API_KEY}"
       OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      OPENAI_MODEL: "${OPENAI_MODEL:-gpt-4.1}"
     volumes:
       - news_data:/app/data
     networks:
