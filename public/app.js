@@ -86,8 +86,8 @@ async function load() {
       $('title').textContent = data.configured ? 'Buscando notícias de tecnologia.' : 'Configure sua chave do Guardian.';
       $('summary').textContent = data.configured ? 'A primeira edição está sendo preparada. O painel começará automaticamente.' : 'Preencha GUARDIAN_API_KEY no arquivo .env e reinicie o servidor.';
       if (fresh) {
-        $('title').textContent = data.translationConfigured ? 'Traduzindo a edição para português.' : 'Configure a tradução com Gemini.';
-        $('summary').textContent = data.translationConfigured ? (data.error || 'Títulos e resumos estão sendo traduzidos. O painel começará automaticamente.') : 'Preencha GEMINI_API_KEY no arquivo .env e reinicie o servidor.';
+        $('title').textContent = data.translationConfigured ? 'Traduzindo a edição para português.' : 'Configure a tradução com OpenAI.';
+        $('summary').textContent = data.translationConfigured ? (data.error || 'Títulos e resumos estão sendo traduzidos. O painel começará automaticamente.') : 'Preencha OPENAI_API_KEY no arquivo .env e reinicie o servidor.';
         $('edition-date').textContent = fmtDate(fresh.date);
         $('edition-count').textContent = `${fresh.count} notícias coletadas`;
       }

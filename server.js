@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fetchGuardianDay } from './guardian.js';
-import { translateEdition } from './gemini.js';
+import { translateEdition } from './openai.js';
 import { createEdition, mergeSource, newsletterMarkdown, sourceCollected } from './edition.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -64,10 +64,10 @@ async function syncIfNeeded() {
   if (syncing || Date.now() < nextAttempt) return;
   const target = previousDate();
   const guardianKey = process.env.GUARDIAN_API_KEY;
-  const geminiKey = process.env.GEMINI_API_KEY;
+  const openaiKey = process.env.OPENAI_API_KEY;
   if (!guardianKey) return;
   const missingSource = edition && !sourceCollected(edition);
-  const pendingTranslation = edition && geminiKey && edition.articles.some(item => item.language !== 'pt-BR');
+  const pendingTranslation = edition && openaiKey && edition.articles.some(item => item.language !== 'pt-BR');
   if (edition?.date >= target && !missingSource && !pendingTranslation) return;
   syncing = true;
   try {
@@ -97,14 +97,14 @@ async function completeEdition() {
 }
 
 async function translateCurrent() {
-  if (!edition || !process.env.GEMINI_API_KEY || edition.articles.every(item => item.language === 'pt-BR')) return;
+  if (!edition || !process.env.OPENAI_API_KEY || edition.articles.every(item => item.language === 'pt-BR')) return;
   translating = true;
   try {
-    await translateEdition(edition, process.env.GEMINI_API_KEY, {
-      model: process.env.GEMINI_MODEL || undefined,
+    await translateEdition(edition, process.env.OPENAI_API_KEY, {
+      model: process.env.OPENAI_MODEL || undefined,
       onBatch: saveEdition
     });
-    console.log(`Gemini ${edition.date}: ${edition.count} notícias traduzidas`);
+    console.log(`OpenAI ${edition.date}: ${edition.count} notícias traduzidas`);
   } finally { translating = false; }
 }
 
@@ -124,7 +124,7 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
     if (req.method !== 'GET') return send(res, 405, { error: 'Método não permitido' });
-    if (url.pathname === '/api/news') return send(res, 200, { edition, syncing, translating, configured: Boolean(process.env.GUARDIAN_API_KEY), guardianConfigured: Boolean(process.env.GUARDIAN_API_KEY), translationConfigured: Boolean(process.env.GEMINI_API_KEY), newsletterReady: newsletterReady(), error: lastError, nextEdition: previousDate() });
+    if (url.pathname === '/api/news') return send(res, 200, { edition, syncing, translating, configured: Boolean(process.env.GUARDIAN_API_KEY), guardianConfigured: Boolean(process.env.GUARDIAN_API_KEY), translationConfigured: Boolean(process.env.OPENAI_API_KEY), newsletterReady: newsletterReady(), error: lastError, nextEdition: previousDate() });
     if (url.pathname === '/api/newsletter.json') return newsletterReady() ? send(res, 200, edition) : send(res, 503, { error: 'Edição ainda não está completa e traduzida' });
     if (url.pathname === '/api/newsletter.md') return newsletterReady() ? send(res, 200, newsletterMarkdown(edition), 'text/markdown; charset=utf-8') : send(res, 503, 'Edição ainda não está completa e traduzida', 'text/plain; charset=utf-8');
     if (url.pathname.startsWith('/api/archive/')) {
