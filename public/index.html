@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0b0d0f">
+  <title>Ativa.ai · Radar Tech</title>
+  <meta name="description" content="Painel interno de notícias de tecnologia da Ativa.ai">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="screen">
+    <header class="topbar">
+      <div class="brand" aria-label="Ativa.ai"><span>Ativa</span><span class="brand-dot">.ai</span></div>
+      <div class="top-divider"></div>
+      <div class="channel"><span class="live-dot"></span> RADAR TECH + IA <span class="channel-secondary">/ EDIÇÃO DIÁRIA</span></div>
+      <div class="top-right"><span id="date">—</span><strong id="clock">--:--</strong></div>
+    </header>
+
+    <section class="content" aria-live="polite">
+      <div class="feature">
+        <div class="feature-image" id="feature-image" aria-hidden="true"></div>
+        <div class="image-fallback" id="image-fallback" aria-hidden="true"><span>TECH</span><span>NEWS</span><i></i></div>
+        <div class="feature-copy" id="feature-copy">
+          <div class="eyebrow"><span class="eyebrow-line"></span><span id="story-number">NOTÍCIA 01</span><span class="eyebrow-separator">/</span><span id="story-source">THE GUARDIAN</span><span id="story-category" class="topic-badge">TECNOLOGIA</span></div>
+          <h1 id="title">Preparando o radar de tecnologia.</h1>
+          <p id="summary">A edição diária aparece aqui assim que a chave do Guardian estiver configurada e a coleta terminar.</p>
+          <div class="feature-meta"><span id="published">AGUARDANDO EDIÇÃO</span><span class="meta-arrow">↗</span><span id="source-link">THEGUARDIAN.COM/TECHNOLOGY</span></div>
+        </div>
+      </div>
+      <aside class="sidebar">
+        <div class="side-heading"><span>NA PRÓXIMA</span><span class="side-icon">↗</span></div>
+        <div id="up-next" class="up-next"><div class="empty-next">As próximas notícias da edição aparecem aqui.</div></div>
+        <div class="side-bottom"><div class="edition-label">EDIÇÃO EM EXIBIÇÃO</div><div class="edition-date" id="edition-date">—</div><div class="edition-count" id="edition-count">Aguardando notícias</div></div>
+      </aside>
+    </section>
+
+    <footer class="bottom">
+      <div class="ticker-label"><span class="ticker-mark">◉</span> EM PAUTA</div>
+      <div class="ticker-window"><div class="ticker-track" id="ticker">Notícias de tecnologia do The Guardian para a equipe Ativa.ai</div></div>
+      <div class="status"><span id="status-dot" class="status-dot"></span><span id="status-text">AGUARDANDO</span></div>
+    </footer>
+    <div class="progress"><div id="progress-bar"></div></div>
+  </main>
+
+  <div class="controls" aria-label="Controles do painel">
+    <button id="prev" title="Notícia anterior (seta esquerda)" aria-label="Notícia anterior">‹</button>
+    <button id="pause" title="Pausar ou retomar (espaço)" aria-label="Pausar">Ⅱ</button>
+    <button id="next" title="Próxima notícia (seta direita)" aria-label="Próxima notícia">›</button>
+    <button id="fullscreen" title="Tela cheia (F)" aria-label="Tela cheia">⛶</button>
+    <a href="/api/newsletter.md" title="Baixar pauta em Markdown" download>↓ pauta</a>
+  </div>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
