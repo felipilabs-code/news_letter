@@ -48,7 +48,8 @@ test('filtra política e mercado, mas mantém produto e infraestrutura', () => {
 
 test('busca ampla exige seção tech ou IA/datacenter no título', () => {
   assert.equal(isRelevant({ title: 'Joshua Wong laments city’s fate', summary: 'AI', section: 'World news', sectionId: 'world' }), false);
-  assert.equal(isRelevant({ title: 'Activists prepare protests against datacentres', summary: '', sectionId: 'world' }), true);
+  assert.equal(isRelevant({ title: 'Activists prepare protests against datacentres', summary: '', sectionId: 'world' }), false);
+  assert.equal(isRelevant({ title: 'UK reliant on China for minerals critical to AI', summary: '', sectionId: 'technology' }), false);
   assert.equal(isRelevant({ title: 'Chatbots are changing search', summary: '', sectionId: 'technology' }), true);
 });
 

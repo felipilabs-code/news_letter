@@ -24,7 +24,7 @@ Deixe o servidor rodando. Para iniciar automaticamente após reiniciar o noteboo
 - A exportação da pauta responde `503` até que todas as fontes com chave configurada tenham sido coletadas e todas as matérias estejam traduzidas. Consulte `/api/news` para ver `newsletterReady`, estado da coleta e eventuais erros.
 - A newsletter separa **IA em foco** e **outras notícias de tecnologia**, identifica o Guardian como fonte e usa título, resumo traduzido e link original. A seleção e a redação final devem passar por revisão editorial; o painel não envia e-mails.
 
-O modelo padrão é `gpt-4o-mini`. Defina `OPENAI_MODEL` no `.env` se sua chave tiver acesso a outro modelo. A tradução consome a cota da API da OpenAI. O texto das manchetes e resumos é enviado à OpenAI para tradução; a chave permanece no servidor e não aparece no navegador.
+O modelo padrão do código é `gpt-4o-mini` (o `.env.example` sugere `gpt-4.1`). Defina `OPENAI_MODEL` no `.env` se sua chave tiver acesso a outro modelo. A tradução consome a cota da API da OpenAI. O texto das manchetes e resumos é enviado à OpenAI para tradução; a chave permanece no servidor e não aparece no navegador.
 
 Controles: **←/→** mudam a notícia, **espaço** pausa, **F** alterna tela cheia. Os botões aparecem ao passar o mouse no canto inferior direito.
 
