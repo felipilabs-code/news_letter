@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fetchGuardianDay, GUARDIAN_QUERY_VERSION } from './guardian.js';
 import { translateEdition } from './openai.js';
+import { fetchRssFeeds } from './rss.js';
 import { createEdition, mergeSource, newsletterMarkdown, sourceCollected } from './edition.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -34,11 +35,12 @@ function schedule(now = new Date()) {
 }
 // A rodada da tarde só complementa; para exibir a edição basta a da manhã.
 const neededRound = (date, { today, dueRound }) => date === today ? dueRound : 2;
-// Edição de D cobre de D-1 14h a D 14h (Brasília, UTC-3); a de hoje vai até agora.
+// Edição de D cobre de D-1 02h até D 14h (Brasília, UTC-3); a de hoje vai até agora.
+// Matérias já publicadas na edição anterior são descartadas no merge (ver previousIds).
 function collectionWindow(edition, plan) {
   const guardian = edition.sources?.guardian;
   const resume = guardian?.queryVersion === GUARDIAN_QUERY_VERSION && guardian.windowEnd;
-  const from = resume ? new Date(Date.parse(resume) - 5 * 60_000).toISOString() : `${dayBefore(edition.date)}T17:00:00Z`;
+  const from = resume ? new Date(Date.parse(resume) - 5 * 60_000).toISOString() : `${dayBefore(edition.date)}T05:00:00Z`;
   const to = edition.date === plan.today ? new Date().toISOString() : `${edition.date}T17:00:00Z`;
   return { from, to };
 }
@@ -101,14 +103,25 @@ async function syncIfNeeded() {
   } finally { syncing = false; }
 }
 
+async function previousIds(date) {
+  try {
+    const previous = JSON.parse(await fs.readFile(filename(dayBefore(date)), 'utf8'));
+    return new Set((previous.articles || []).map(item => item.id));
+  } catch { return new Set(); }
+}
+
 async function completeEdition(plan) {
   const round = neededRound(edition.date, plan);
   if (process.env.GUARDIAN_API_KEY && !sourceCollected(edition, round)) {
     const window = collectionWindow(edition, plan);
-    const fresh = await fetchGuardianDay(edition.date, process.env.GUARDIAN_API_KEY, window);
-    mergeSource(edition, fresh, round);
+    const [fresh, rss, exclude] = await Promise.all([
+      fetchGuardianDay(edition.date, process.env.GUARDIAN_API_KEY, window),
+      fetchRssFeeds(window),
+      previousIds(edition.date)
+    ]);
+    mergeSource(edition, fresh, round, { rss, exclude });
     await saveEdition(edition);
-    console.log(`Guardian ${edition.date} (rodada ${round}): ${fresh.count} novas, ${edition.count} no total`);
+    console.log(`Guardian ${edition.date} (rodada ${round}): ${fresh.count} do Guardian + ${rss.count} de RSS, ${edition.count} no total`);
   }
   await translateCurrent();
 }

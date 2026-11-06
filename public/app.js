@@ -9,11 +9,11 @@ function render() {
   if (!articles.length) return;
   const item = articles[index];
   $('title').textContent = item.title;
-  $('summary').textContent = item.summary || 'Leia a matéria completa no The Guardian.';
+  $('summary').textContent = item.summary || 'Leia a matéria completa no link original.';
   $('story-number').textContent = `NOTÍCIA ${String(index + 1).padStart(2, '0')} / ${String(articles.length).padStart(2, '0')}`;
   $('story-source').textContent = (item.source || 'The Guardian').toUpperCase();
   $('story-category').textContent = item.topics?.includes('ai') ? 'IA EM FOCO' : 'TECNOLOGIA';
-  $('source-link').textContent = 'THEGUARDIAN.COM/TECHNOLOGY';
+  $('source-link').textContent = (() => { try { return new URL(item.url).hostname.replace(/^www\./, '').toUpperCase(); } catch { return ''; } })();
   $('published').textContent = `PUBLICADO ${fmtTime(item.publishedAt)}`;
   const image = safeImage(item.thumbnail);
   showFeatureImage(image);
@@ -74,14 +74,15 @@ async function load() {
     if (ready && signature !== state.editionSignature) {
       state.editionSignature = signature; state.articles = fresh.articles || []; state.index = 0;
       $('edition-date').textContent = fmtDate(fresh.date);
-      $('edition-count').textContent = `${fresh.count} notícias do Guardian`;
+      $('edition-count').textContent = `${fresh.count} notícias de tecnologia`;
       $('ticker').replaceChildren(...state.articles.flatMap((item, i) => {
         const text = document.createElement('span'); text.textContent = item.title;
         const sep = document.createElement('b'); sep.textContent = '✳'; return [text, sep];
       }));
       render();
     }
-    if (!ready) {
+    // Durante a tradução da rodada seguinte, a TV segue exibindo o que já estava no ar.
+    if (!ready && !state.articles.length) {
       state.articles = [];
       $('title').textContent = data.configured ? 'Buscando notícias de tecnologia.' : 'Configure sua chave do Guardian.';
       $('summary').textContent = data.configured ? 'A primeira edição está sendo preparada. O painel começará automaticamente.' : 'Preencha GUARDIAN_API_KEY no arquivo .env e reinicie o servidor.';

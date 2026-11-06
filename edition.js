@@ -15,14 +15,17 @@ export function sourceCollected(edition, round = 2) {
   return Boolean(guardian?.fetchedAt) && guardian.queryVersion === GUARDIAN_QUERY_VERSION && (guardian.round ?? 2) >= round;
 }
 
-export function mergeSource(edition, fetched, round = 2) {
+// rss: artigos de feeds extras da mesma rodada; exclude: ids já publicados na edição anterior.
+export function mergeSource(edition, fetched, round = 2, { rss = null, exclude = new Set() } = {}) {
   const previous = edition.sources?.guardian;
   const sameQuery = previous?.queryVersion === fetched.queryVersion;
   // Rodadas do mesmo dia acrescentam sem repetir; consulta nova recomeça do zero.
   const byId = new Map((sameQuery ? edition.articles : []).map(item => [item.id, item]));
-  for (const item of fetched.articles) if (!byId.has(item.id)) byId.set(item.id, { ...item, source: 'The Guardian' });
+  const incoming = [...fetched.articles.map(item => ({ ...item, source: item.source || 'The Guardian' })), ...(rss?.articles || [])];
+  for (const item of incoming) if (!exclude.has(item.id) && !byId.has(item.id)) byId.set(item.id, item);
   edition.articles = [...byId.values()].sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
-  edition.sources = { guardian: {
+  const rssInfo = rss ? { fetchedAt: rss.fetchedAt, count: rss.count } : sameQuery ? edition.sources?.rss : undefined;
+  edition.sources = { ...(rssInfo ? { rss: rssInfo } : {}), guardian: {
     fetchedAt: fetched.fetchedAt, count: edition.articles.length, queryVersion: fetched.queryVersion,
     round: Math.max(round, sameQuery ? previous.round ?? 0 : 0), windowEnd: fetched.windowEnd
   } };
@@ -38,7 +41,7 @@ export function newsletterMarkdown(edition) {
   const lines = [
     `# Radar Tech + IA · ${edition.date}`,
     '',
-    `${articles.length} notícias do The Guardian`,
+    `${articles.length} notícias de ${[...new Set(articles.map(item => item.source || 'The Guardian'))].join(', ') || 'The Guardian'}`,
     '',
     'Pauta para revisão editorial. Títulos e resumos foram traduzidos automaticamente; confira as matérias antes do envio.',
     ''

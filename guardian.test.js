@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fetchGuardianDay, makeGuardianUrl, isOffTopic, isRelevant } from './guardian.js';
+import { fetchGuardianDay, makeGuardianUrl, isOffTopic, isRelevant, GUARDIAN_QUERY_VERSION } from './guardian.js';
 import { newsletterMarkdown, mergeSource, sourceCollected } from './edition.js';
 
 test('consulta technology, data de publicação e todos os resultados paginados', async () => {
@@ -14,14 +14,15 @@ test('consulta technology, data de publicação e todos os resultados paginados'
     }] } }) };
   };
   const edition = await fetchGuardianDay('2026-10-26', 'secret', { fetchImpl, wait: async () => {} });
-  assert.equal(calls.length, 4);
+  assert.equal(calls.length, 14); // 7 buscas x 2 páginas
   assert.equal(calls[0].searchParams.get('section'), 'technology');
   assert.equal(calls[0].searchParams.get('from-date'), '2026-10-26');
   assert.equal(calls[0].searchParams.get('to-date'), '2026-10-26');
   assert.equal(calls[0].searchParams.get('use-date'), 'published');
   assert.equal(calls[1].searchParams.get('page'), '2');
-  assert.match(calls[2].searchParams.get('q'), /artificial intelligence/);
+  assert.equal(calls[2].searchParams.get('tag'), 'technology/artificialintelligenceai');
   assert.equal(calls[2].searchParams.has('section'), false);
+  assert.match(calls[12].searchParams.get('q'), /artificial intelligence/);
   assert.equal(edition.count, 2);
   assert.equal(edition.articles[0].summary, 'Resumo & contexto');
   assert.match(newsletterMarkdown(edition), /\[Ler matéria original\]/);
@@ -54,11 +55,11 @@ test('busca ampla exige seção tech ou IA/datacenter no título', () => {
 test('rodadas do mesmo dia acrescentam sem repetir e preservam traduções', () => {
   const edition = { date: '2026-11-06', articles: [], sources: {} };
   const article = (id, at) => ({ id, title: id, publishedAt: at, url: `https://x/${id}` });
-  mergeSource(edition, { fetchedAt: 'a', queryVersion: 3, windowEnd: 'w1', articles: [article('a', '2026-11-06T09:00:00Z')] }, 1);
+  mergeSource(edition, { fetchedAt: 'a', queryVersion: GUARDIAN_QUERY_VERSION, windowEnd: 'w1', articles: [article('a', '2026-11-06T09:00:00Z')] }, 1);
   edition.articles[0].language = 'pt-BR';
   assert.equal(sourceCollected(edition, 1), true);
   assert.equal(sourceCollected(edition, 2), false);
-  mergeSource(edition, { fetchedAt: 'b', queryVersion: 3, windowEnd: 'w2', articles: [article('a', '2026-11-06T09:00:00Z'), article('b', '2026-11-06T15:00:00Z')] }, 2);
+  mergeSource(edition, { fetchedAt: 'b', queryVersion: GUARDIAN_QUERY_VERSION, windowEnd: 'w2', articles: [article('a', '2026-11-06T09:00:00Z'), article('b', '2026-11-06T15:00:00Z')] }, 2);
   assert.deepEqual(edition.articles.map(item => item.id), ['b', 'a']);
   assert.equal(edition.articles.find(item => item.id === 'a').language, 'pt-BR');
   assert.equal(edition.sources.guardian.round, 2);
