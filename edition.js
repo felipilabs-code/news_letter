@@ -9,16 +9,23 @@ export function createEdition(date) {
   return { date, fetchedAt: new Date().toISOString(), count: 0, sources: {}, articles: [] };
 }
 
-export function sourceCollected(edition) {
-  if (edition.sources?.guardian?.fetchedAt) return edition.sources.guardian.queryVersion === GUARDIAN_QUERY_VERSION;
-  return false;
+// round: 1 = rodada das 07h, 2 = rodada das 14h (a edição só está completa com a rodada pedida).
+export function sourceCollected(edition, round = 2) {
+  const guardian = edition.sources?.guardian;
+  return Boolean(guardian?.fetchedAt) && guardian.queryVersion === GUARDIAN_QUERY_VERSION && (guardian.round ?? 2) >= round;
 }
 
-export function mergeSource(edition, fetched) {
-  edition.articles = fetched.articles.map(item => ({ ...item, source: 'The Guardian' }))
-    .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
-  edition.sources ??= {};
-  edition.sources = { guardian: { fetchedAt: fetched.fetchedAt, count: fetched.count, queryVersion: fetched.queryVersion } };
+export function mergeSource(edition, fetched, round = 2) {
+  const previous = edition.sources?.guardian;
+  const sameQuery = previous?.queryVersion === fetched.queryVersion;
+  // Rodadas do mesmo dia acrescentam sem repetir; consulta nova recomeça do zero.
+  const byId = new Map((sameQuery ? edition.articles : []).map(item => [item.id, item]));
+  for (const item of fetched.articles) if (!byId.has(item.id)) byId.set(item.id, { ...item, source: 'The Guardian' });
+  edition.articles = [...byId.values()].sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
+  edition.sources = { guardian: {
+    fetchedAt: fetched.fetchedAt, count: edition.articles.length, queryVersion: fetched.queryVersion,
+    round: Math.max(round, sameQuery ? previous.round ?? 0 : 0), windowEnd: fetched.windowEnd
+  } };
   edition.count = edition.articles.length;
   edition.updatedAt = new Date().toISOString();
   return edition;

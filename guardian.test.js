@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fetchGuardianDay, makeGuardianUrl } from './guardian.js';
-import { newsletterMarkdown } from './edition.js';
+import { fetchGuardianDay, makeGuardianUrl, isOffTopic, isRelevant } from './guardian.js';
+import { newsletterMarkdown, mergeSource, sourceCollected } from './edition.js';
 
 test('consulta technology, data de publicação e todos os resultados paginados', async () => {
   const calls = [];
@@ -32,4 +32,35 @@ test('rejeita erro de autenticação sem salvar edição parcial', async () => {
     fetchImpl: async () => ({ ok: false, status: 403 }), wait: async () => {}
   }), /Guardian HTTP 403/);
   assert.equal(makeGuardianUrl('2026-10-26', 1, 'key').origin, 'https://content.guardianapis.com');
+});
+
+test('filtra política e mercado, mas mantém produto e infraestrutura', () => {
+  const off = [
+    { title: 'Elon Musk’s nearly half a billion dollars in midterms spending was a flop', summary: '' },
+    { title: 'Tech barons cozied up to Trump. What will they do in newly blue America?', summary: '' },
+    { title: 'Winner of the Prix Goncourt literary prize admits to using AI', summary: '' }
+  ];
+  for (const item of off) assert.equal(isOffTopic(item), true, item.title);
+  assert.equal(isOffTopic({ title: 'Apple iPad mini A20 Pro review: the best small tablet', summary: '' }), false);
+  assert.equal(isOffTopic({ title: 'OpenAI launches new model as Trump admin weighs rules', summary: '' }), false);
+});
+
+test('busca ampla exige seção tech ou IA/datacenter no título', () => {
+  assert.equal(isRelevant({ title: 'Joshua Wong laments city’s fate', summary: 'AI', section: 'World news', sectionId: 'world' }), false);
+  assert.equal(isRelevant({ title: 'Activists prepare protests against datacentres', summary: '', sectionId: 'world' }), true);
+  assert.equal(isRelevant({ title: 'Chatbots are changing search', summary: '', sectionId: 'technology' }), true);
+});
+
+test('rodadas do mesmo dia acrescentam sem repetir e preservam traduções', () => {
+  const edition = { date: '2026-11-06', articles: [], sources: {} };
+  const article = (id, at) => ({ id, title: id, publishedAt: at, url: `https://x/${id}` });
+  mergeSource(edition, { fetchedAt: 'a', queryVersion: 3, windowEnd: 'w1', articles: [article('a', '2026-11-06T09:00:00Z')] }, 1);
+  edition.articles[0].language = 'pt-BR';
+  assert.equal(sourceCollected(edition, 1), true);
+  assert.equal(sourceCollected(edition, 2), false);
+  mergeSource(edition, { fetchedAt: 'b', queryVersion: 3, windowEnd: 'w2', articles: [article('a', '2026-11-06T09:00:00Z'), article('b', '2026-11-06T15:00:00Z')] }, 2);
+  assert.deepEqual(edition.articles.map(item => item.id), ['b', 'a']);
+  assert.equal(edition.articles.find(item => item.id === 'a').language, 'pt-BR');
+  assert.equal(edition.sources.guardian.round, 2);
+  assert.equal(edition.sources.guardian.windowEnd, 'w2');
 });

@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fetchGuardianDay } from './guardian.js';
+import { fetchGuardianDay, GUARDIAN_QUERY_VERSION } from './guardian.js';
 import { translateEdition } from './openai.js';
 import { createEdition, mergeSource, newsletterMarkdown, sourceCollected } from './edition.js';
 
@@ -23,10 +23,25 @@ await loadEnv();
 await fs.mkdir(dataDir, { recursive: true });
 
 const localDate = (when = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(when);
-const previousDate = () => {
-  const today = localDate();
-  return new Date(Date.parse(`${today}T00:00:00Z`) - 86400000).toISOString().slice(0, 10);
-};
+const dayBefore = date => new Date(Date.parse(`${date}T00:00:00Z`) - 86400000).toISOString().slice(0, 10);
+const ROUNDS = [7, 14]; // horários (Brasília) das rodadas de coleta
+// Rodada vencida agora (0 = antes das 07h) e a data da edição que a TV deve exibir.
+function schedule(now = new Date()) {
+  const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: zone, hour: '2-digit', hourCycle: 'h23' }).format(now));
+  const dueRound = ROUNDS.filter(start => hour >= start).length;
+  const today = localDate(now);
+  return { today, dueRound, target: dueRound ? today : dayBefore(today) };
+}
+// A rodada da tarde só complementa; para exibir a edição basta a da manhã.
+const neededRound = (date, { today, dueRound }) => date === today ? dueRound : 2;
+// Edição de D cobre de D-1 14h a D 14h (Brasília, UTC-3); a de hoje vai até agora.
+function collectionWindow(edition, plan) {
+  const guardian = edition.sources?.guardian;
+  const resume = guardian?.queryVersion === GUARDIAN_QUERY_VERSION && guardian.windowEnd;
+  const from = resume ? new Date(Date.parse(resume) - 5 * 60_000).toISOString() : `${dayBefore(edition.date)}T17:00:00Z`;
+  const to = edition.date === plan.today ? new Date().toISOString() : `${edition.date}T17:00:00Z`;
+  return { from, to };
+}
 const safeDate = value => /^\d{4}-\d{2}-\d{2}$/.test(value || '');
 const filename = date => path.join(dataDir, `${date}.json`);
 function guardianOnly(value) {
@@ -62,20 +77,21 @@ await loadLatest();
 
 async function syncIfNeeded() {
   if (syncing || Date.now() < nextAttempt) return;
-  const target = previousDate();
+  const plan = schedule();
+  const { target } = plan;
   const guardianKey = process.env.GUARDIAN_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!guardianKey) return;
-  const missingSource = edition && !sourceCollected(edition);
+  const missingSource = edition && !sourceCollected(edition, neededRound(edition.date, plan));
   const pendingTranslation = edition && openaiKey && edition.articles.some(item => item.language !== 'pt-BR');
   if (edition?.date >= target && !missingSource && !pendingTranslation) return;
   syncing = true;
   try {
-    if (edition) await completeEdition();
+    if (edition) await completeEdition(plan);
     const start = edition?.date ? new Date(Date.parse(`${edition.date}T00:00:00Z`) + 86400000).toISOString().slice(0, 10) : target;
     for (let date = start; date <= target; date = new Date(Date.parse(`${date}T00:00:00Z`) + 86400000).toISOString().slice(0, 10)) {
       edition = createEdition(date);
-      await completeEdition();
+      await completeEdition(plan);
     }
     lastError = null;
   } catch (error) {
@@ -85,13 +101,14 @@ async function syncIfNeeded() {
   } finally { syncing = false; }
 }
 
-async function completeEdition() {
-  if (process.env.GUARDIAN_API_KEY && !sourceCollected(edition)) {
-    const fresh = await fetchGuardianDay(edition.date, process.env.GUARDIAN_API_KEY);
-    mergeSource(edition, fresh);
+async function completeEdition(plan) {
+  const round = neededRound(edition.date, plan);
+  if (process.env.GUARDIAN_API_KEY && !sourceCollected(edition, round)) {
+    const window = collectionWindow(edition, plan);
+    const fresh = await fetchGuardianDay(edition.date, process.env.GUARDIAN_API_KEY, window);
+    mergeSource(edition, fresh, round);
     await saveEdition(edition);
-    console.log(`Guardian ${edition.date}: ${fresh.count} notícias salvas`);
-    await translateCurrent();
+    console.log(`Guardian ${edition.date} (rodada ${round}): ${fresh.count} novas, ${edition.count} no total`);
   }
   await translateCurrent();
 }
@@ -114,8 +131,10 @@ function send(res, status, body, type = 'application/json; charset=utf-8') {
 }
 
 function newsletterReady() {
-  return Boolean(edition &&
-    (!process.env.GUARDIAN_API_KEY || sourceCollected(edition)) &&
+  const plan = schedule();
+  // Só a edição vigente (hoje a partir das 07h, ontem antes disso) conta como pronta.
+  return Boolean(edition && edition.date === plan.target &&
+    (!process.env.GUARDIAN_API_KEY || sourceCollected(edition, 1)) &&
     edition.articles.every(item => item.language === 'pt-BR'));
 }
 
@@ -124,7 +143,7 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
     if (req.method !== 'GET') return send(res, 405, { error: 'Método não permitido' });
-    if (url.pathname === '/api/news') return send(res, 200, { edition, syncing, translating, configured: Boolean(process.env.GUARDIAN_API_KEY), guardianConfigured: Boolean(process.env.GUARDIAN_API_KEY), translationConfigured: Boolean(process.env.OPENAI_API_KEY), newsletterReady: newsletterReady(), error: lastError, nextEdition: previousDate() });
+    if (url.pathname === '/api/news') return send(res, 200, { edition, syncing, translating, configured: Boolean(process.env.GUARDIAN_API_KEY), guardianConfigured: Boolean(process.env.GUARDIAN_API_KEY), translationConfigured: Boolean(process.env.OPENAI_API_KEY), newsletterReady: newsletterReady(), error: lastError, nextEdition: schedule().target });
     if (url.pathname === '/api/newsletter.json') return newsletterReady() ? send(res, 200, edition) : send(res, 503, { error: 'Edição ainda não está completa e traduzida' });
     if (url.pathname === '/api/newsletter.md') return newsletterReady() ? send(res, 200, newsletterMarkdown(edition), 'text/markdown; charset=utf-8') : send(res, 503, 'Edição ainda não está completa e traduzida', 'text/plain; charset=utf-8');
     if (url.pathname.startsWith('/api/archive/')) {
